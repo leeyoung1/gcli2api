@@ -612,8 +612,7 @@ def resolve_profile(model: str) -> ModelProfile:
 
       image                  图片生成，走独立路径
       claude (haiku)         映射到 gemini-2.5-flash
-      claude (opus)          映射到 claude-opus-4-6-thinking
-      claude (其他)          映射到 claude-sonnet-4-6；不支持预填充
+      claude (opus/sonnet)   映射到 5.5 系列（保留 -low/-medium/-high 档位）；不支持预填充
       gemini-3* / *-agent    思考深度由模型 ID (-low/-medium/-high/-tiered/-extra-low) 决定
       gemini (其他, 2.5 等)  名字含 think 才发 thinkingBudget
       其他                   原样透传
@@ -628,8 +627,11 @@ def resolve_profile(model: str) -> ModelProfile:
     if "claude" in lower:
         if "haiku" in lower:
             return ModelProfile("gemini25", "gemini-2.5-flash", think)
-        upstream = "claude-opus-4-6-thinking" if "opus" in lower else "claude-sonnet-4-6"
-        return ModelProfile("claude", upstream, think, no_prefill=True)
+        # 修复: Google 已下线 Claude 4.6，上游返回 "is no longer available"，
+        # 改为映射到 5.5 系列真实枚举，并透传请求中的档位后缀 (-low/-medium/-high)
+        series = "opus" if "opus" in lower else "sonnet"
+        tier = "-high" if "-high" in lower else ("-low" if "-low" in lower else "-medium")
+        return ModelProfile("claude", f"claude-{series}-5-5{tier}", think, no_prefill=True)
 
     if "gemini-3" in lower or lower.endswith("-agent"):
         return ModelProfile(
