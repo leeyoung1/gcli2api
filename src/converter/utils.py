@@ -169,6 +169,17 @@ async def merge_system_messages(request_body: Dict[str, Any]) -> Dict[str, Any]:
                 request_body = request_body.copy()
                 request_body["systemInstruction"] = {"parts": system_parts}
 
+    # 规范化: OpenAI 新规范允许用 developer 角色表示系统提示（o1 系模型引入），
+    # 而 Gemini 后端只认 USER/MODEL，未处理的 developer 角色会透传导致上游 400
+    # "Role 'developer' is not supported"。统一映射为 system 后走既有处理逻辑。
+    raw_messages = request_body.get("messages", [])
+    if any(isinstance(m, dict) and m.get("role") == "developer" for m in raw_messages):
+        request_body = request_body.copy()
+        request_body["messages"] = [
+            {**m, "role": "system"} if isinstance(m, dict) and m.get("role") == "developer" else m
+            for m in raw_messages
+        ]
+
     messages = request_body.get("messages", [])
     if not messages:
         return request_body
